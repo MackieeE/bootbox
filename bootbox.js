@@ -73,6 +73,8 @@
     locale: "en",
     // show backdrop or not. Default to static so user has to interact with dialog
     backdrop: "static",
+	// allow stacking of each modal if more than one is open.
+	allowStacked: false,
     // animate the modal in/out
     animate: true,
     // additional class string applied to the top level dialog
@@ -296,11 +298,15 @@
   exports.alert = function() {
     var options;
 
-    options = mergeDialogOptions("alert", ["ok"], ["message", "callback"], arguments);
+    options = mergeDialogOptions("alert", ["ok"], ["message", "callback", "onLoad"], arguments);
 
     if (options.callback && !$.isFunction(options.callback)) {
       throw new Error("alert requires callback property to be a function when provided");
     }
+	
+	if(options.onLoad && !$.isFunction(options.onLoad)) {
+		throw new Error("alert requires onLoad-callback property to be a function when provided");
+	}
 
     /**
      * overrides
@@ -644,6 +650,12 @@
      */
 
     dialog.on("hidden.bs.modal", function(e) {
+	
+      if ( options.allowStacked ){
+		    dialog.removeClass( 'fv-modal-stack' );
+			$('body').data( 'fv_open_modals', $('body').data( 'fv_open_modals' ) - 1 );
+	  }
+		
       // ensure we don't accidentally intercept hidden events triggered
       // by children of the current dialog. We shouldn't anymore now BS
       // namespaces its events; but still worth doing
@@ -664,6 +676,29 @@
     */
 
     dialog.on("shown.bs.modal", function() {
+	
+      if ( options.allowStacked ) {
+		   //keep track of the number of open modals
+		   if ( typeof( $('body').data( 'fv_open_modals' )) == 'undefined' ){
+			   $('body').data( 'fv_open_modals', 0 );
+		   }
+		  
+		   // if the z-index of this modal has been set, ignore.   
+		   if ( dialog.hasClass( 'fv-modal-stack' ))
+				return;
+		   
+		   dialog.addClass( 'fv-modal-stack' );
+		   $('body').data( 'fv_open_modals', $('body').data( 'fv_open_modals' ) + 1 );
+		   dialog.css('z-index', 1040 + (10 * $('body').data( 'fv_open_modals' )));
+		
+		   $( '.modal-backdrop', document ).not( '.fv-modal-stack' ).css( 'z-index', 1039 + (10 * $('body').data( 'fv_open_modals' )));
+		   $( '.modal-backdrop', document ).not( 'fv-modal-stack' ).addClass( 'fv-modal-stack' ); 
+	  }	
+	  
+	  if( options.onLoad ) {
+		  options.onLoad(); 
+	  }
+		
       dialog.find(".btn-primary:first").focus();
     });
 
